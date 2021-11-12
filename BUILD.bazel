@@ -147,8 +147,6 @@ pkg_tar(
     srcs = [
         "scripts/bash_autocomplete.sh",
         "scripts/rabbitmq-script-wrapper",
-        "scripts/rabbitmq-server-ha.ocf",
-        "scripts/rabbitmq-server.ocf",
         "scripts/rabbitmqctl-autocomplete.sh",
         "scripts/zsh_autocomplete.sh",
     ],
