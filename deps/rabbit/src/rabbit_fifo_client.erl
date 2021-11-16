@@ -738,6 +738,8 @@ handle_delivery(Leader, {delivery, Tag, [{FstId, _} | _] = IdMsgs},
                        consumer_deliveries = CDels0} = State0) ->
     QRef = qref(Leader),
     {LastId, _} = lists:last(IdMsgs),
+    %% Note:
+    %% https://github.com/rabbitmq/rabbitmq-server/issues/3729
     Consumer = #consumer{ack = Ack} = maps:get(Tag, CDels0, #consumer{last_msg_id = -1}),
     %% format as a deliver action
     Del = {deliver, Tag, Ack, transform_msgs(QName, QRef, IdMsgs)},
