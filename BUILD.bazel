@@ -185,7 +185,21 @@ pkg_tar(
     package_dir = "rabbitmq_server-{}".format(APP_VERSION),
     strip_prefix = "broker-home",
     visibility = ["//visibility:public"],
-    # extension = "tar.xz",
+    extension = "tar.xz",
+    deps = [
+        ":license-files",
+        ":release-notes",
+        ":scripts",
+    ],
+)
+
+pkg_tar(
+    name = "package-generic-unix-no-prefix",
+    srcs = [
+        ":broker-home",
+    ],
+    strip_prefix = "broker-home",
+    visibility = ["//visibility:public"],
     deps = [
         ":license-files",
         ":release-notes",
