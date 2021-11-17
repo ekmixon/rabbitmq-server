@@ -6,6 +6,7 @@ load(":rabbitmq_home.bzl", "rabbitmq_home")
 load(":rabbitmq_run.bzl", "rabbitmq_run", "rabbitmq_run_command")
 load(":rabbitmqctl.bzl", "rabbitmqctl")
 load(":rabbitmq.bzl", "APP_VERSION")
+load(":dist.bzl", "collect_licenses")
 
 exports_files([
     "scripts/bazel/rabbitmq-run.sh",
@@ -135,11 +136,23 @@ shell(
     deps = ALL_PLUGINS,
 )
 
-# Note that license-files is incomplete, as it does
-# not currently cover the deps
+collect_licenses(
+    name = "licenses",
+    srcs = glob(
+        ["LICENSE*"],
+        exclude = [
+            "LICENSE.md",
+            "LICENSE.txt",
+        ],
+    ),
+    deps = ALL_PLUGINS,
+)
+
+# need to add the INSTALL file
+
 pkg_tar(
     name = "license-files",
-    srcs = glob(["LICENSE*"]),
+    srcs = [":licenses"],
 )
 
 pkg_tar(
@@ -162,6 +175,8 @@ pkg_tar(
     package_dir = "release-notes",
 )
 
+# need to add the /share/man path to the archive
+
 pkg_tar(
     name = "package-generic-unix",
     srcs = [
@@ -169,11 +184,11 @@ pkg_tar(
     ],
     package_dir = "rabbitmq_server-{}".format(APP_VERSION),
     strip_prefix = "broker-home",
-    extension = "tar.xz",
+    visibility = ["//visibility:public"],
+    # extension = "tar.xz",
     deps = [
         ":license-files",
-        ":scripts",
         ":release-notes",
+        ":scripts",
     ],
-    visibility = ["//visibility:public"],
 )
