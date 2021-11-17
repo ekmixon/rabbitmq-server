@@ -8,7 +8,7 @@ RabbitmqHomeInfo = provider(
     },
 )
 
-def _copy_script(ctx, script):
+def copy_script(ctx, script):
     dest = ctx.actions.declare_file(path_join(ctx.label.name, "sbin", script.basename))
     args = ctx.actions.args()
     args.add_all([script, dest])
@@ -20,7 +20,7 @@ def _copy_script(ctx, script):
     )
     return dest
 
-def _link_escript(ctx, escript):
+def link_escript(ctx, escript):
     e = ctx.attr._rabbitmqctl_escript.files_to_run.executable
     s = ctx.actions.declare_file(path_join(ctx.label.name, "escript", escript))
     ctx.actions.symlink(
@@ -70,7 +70,7 @@ def _plugins_dir_links(ctx, plugin):
 
     return links
 
-def _unique_versions(plugins):
+def unique_versions(plugins):
     erlang_versions = []
     for plugin in plugins:
         erlang_version = plugin[ErlangLibInfo].erlang_version
@@ -78,17 +78,17 @@ def _unique_versions(plugins):
             erlang_versions.append(erlang_version)
     return erlang_versions
 
-def _flatten(list_of_lists):
+def flatten(list_of_lists):
     return [item for sublist in list_of_lists for item in sublist]
 
 def _impl(ctx):
     plugins = flat_deps(ctx.attr.plugins)
 
-    erlang_versions = _unique_versions(plugins)
+    erlang_versions = unique_versions(plugins)
     if len(erlang_versions) > 1:
         fail("plugins do not have a unified erlang version", erlang_versions)
 
-    scripts = [_copy_script(ctx, script) for script in ctx.files._scripts]
+    scripts = [copy_script(ctx, script) for script in ctx.files._scripts]
 
     rabbitmq_ctl_copies = [
         "rabbitmq-diagnostics",
@@ -98,9 +98,9 @@ def _impl(ctx):
         "rabbitmq-upgrade",
         "rabbitmqctl",
     ]
-    escripts = [_link_escript(ctx, escript) for escript in rabbitmq_ctl_copies]
+    escripts = [link_escript(ctx, escript) for escript in rabbitmq_ctl_copies]
 
-    plugins = _flatten([_plugins_dir_links(ctx, plugin) for plugin in plugins])
+    plugins = flatten([_plugins_dir_links(ctx, plugin) for plugin in plugins])
 
     rabbitmqctl = None
     for script in scripts:
@@ -118,24 +118,26 @@ def _impl(ctx):
         ),
     ]
 
+RABBITMQ_HOME_ATTRS = {
+    "_scripts": attr.label_list(
+        default = [
+            "//deps/rabbit:scripts/rabbitmq-defaults",
+            "//deps/rabbit:scripts/rabbitmq-diagnostics",
+            "//deps/rabbit:scripts/rabbitmq-env",
+            "//deps/rabbit:scripts/rabbitmq-plugins",
+            "//deps/rabbit:scripts/rabbitmq-queues",
+            "//deps/rabbit:scripts/rabbitmq-server",
+            "//deps/rabbit:scripts/rabbitmqctl",
+        ],
+        allow_files = True,
+    ),
+    "_rabbitmqctl_escript": attr.label(default = "//deps/rabbitmq_cli:rabbitmqctl"),
+    "plugins": attr.label_list(providers = [ErlangLibInfo]),
+}
+
 rabbitmq_home = rule(
     implementation = _impl,
-    attrs = {
-        "_scripts": attr.label_list(
-            default = [
-                "//deps/rabbit:scripts/rabbitmq-defaults",
-                "//deps/rabbit:scripts/rabbitmq-diagnostics",
-                "//deps/rabbit:scripts/rabbitmq-env",
-                "//deps/rabbit:scripts/rabbitmq-plugins",
-                "//deps/rabbit:scripts/rabbitmq-queues",
-                "//deps/rabbit:scripts/rabbitmq-server",
-                "//deps/rabbit:scripts/rabbitmqctl",
-            ],
-            allow_files = True,
-        ),
-        "_rabbitmqctl_escript": attr.label(default = "//deps/rabbitmq_cli:rabbitmqctl"),
-        "plugins": attr.label_list(),
-    },
+    attrs = RABBITMQ_HOME_ATTRS,
 )
 
 def _dirname(p):
