@@ -1,4 +1,5 @@
 load("@bazel-erlang//:bazel_erlang_lib.bzl", "ErlangLibInfo", "flat_deps", "path_join")
+load("@bazel-erlang//:ct.bzl", "additional_file_dest_relative_path")
 
 RabbitmqHomeInfo = provider(
     doc = "An assembled RABBITMQ_HOME dir",
@@ -27,19 +28,6 @@ def _link_escript(ctx, escript):
         target_file = e,
     )
     return s
-
-def _priv_file_dest_relative_path(plugin_label, f):
-    if plugin_label.workspace_root != "":
-        if plugin_label.package != "":
-            rel_base = path_join(plugin_label.workspace_root, plugin_label.package)
-        else:
-            rel_base = plugin_label.workspace_root
-    else:
-        rel_base = plugin_label.package
-    if rel_base != "":
-        return f.path.replace(rel_base + "/", "")
-    else:
-        return f.path
 
 def _plugins_dir_links(ctx, plugin):
     lib_info = plugin[ErlangLibInfo]
@@ -72,7 +60,7 @@ def _plugins_dir_links(ctx, plugin):
         links.append(o)
 
     for f in lib_info.priv:
-        p = _priv_file_dest_relative_path(plugin.label, f)
+        p = additional_file_dest_relative_path(plugin.label, f)
         o = ctx.actions.declare_file(path_join(plugin_path, p))
         ctx.actions.symlink(
             output = o,
