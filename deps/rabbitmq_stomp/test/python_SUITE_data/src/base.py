@@ -63,40 +63,42 @@ class BaseTest(unittest.TestCase):
             conn.subscribe(destination, **kwargs)
         else:
             # 'id' is required in STOMP 1.1+.
-            if sub_id == None:
+            if sub_id is None:
                 sub_id = 'ctag'
             conn.subscribe(destination, sub_id, **kwargs)
 
     def unsubscribe_dest(self, conn, destination, sub_id, **kwargs):
         if type(conn) is stomp.StompConnection10:
             # 'id' is optional in STOMP 1.0.
-            if sub_id != None:
-                conn.unsubscribe(id=sub_id, **kwargs)
-            else:
+            if sub_id is None:
                 conn.unsubscribe(destination=destination, **kwargs)
+            else:
+                conn.unsubscribe(id=sub_id, **kwargs)
         else:
             # 'id' is required in STOMP 1.1+.
-            if sub_id == None:
-                sub_id = 'stomp-sub-id {}'.format(random.randint(0, 1000))
+            if sub_id is None:
+                sub_id = f'stomp-sub-id {random.randint(0, 1000)}'
             conn.unsubscribe(sub_id, **kwargs)
 
     def ack_message(self, conn, msg_id, sub_id, **kwargs):
-        if type(conn) is stomp.StompConnection10:
+        if (
+            type(conn) is stomp.StompConnection10
+            or type(conn) is not stomp.StompConnection11
+            and type(conn) is stomp.StompConnection12
+        ):
             conn.ack(msg_id, **kwargs)
         elif type(conn) is stomp.StompConnection11:
-            if sub_id == None:
-                sub_id = 'stomp-sub-id {}'.format(random.randint(0, 1000))
+            if sub_id is None:
+                sub_id = f'stomp-sub-id {random.randint(0, 1000)}'
             conn.ack(msg_id, sub_id, **kwargs)
-        elif type(conn) is stomp.StompConnection12:
-            conn.ack(msg_id, **kwargs)
 
     def nack_message(self, conn, msg_id, sub_id, **kwargs):
         if type(conn) is stomp.StompConnection10:
             # Normally unsupported by STOMP 1.0.
             conn.send_frame("NACK", {"message-id": msg_id})
         elif type(conn) is stomp.StompConnection11:
-            if sub_id == None:
-                sub_id = 'stomp-sub-id {}'.format(random.randint(0, 1000))
+            if sub_id is None:
+                sub_id = f'stomp-sub-id {random.randint(0, 1000)}'
             conn.nack(msg_id, sub_id, **kwargs)
         elif type(conn) is stomp.StompConnection12:
             conn.nack(msg_id, **kwargs)
@@ -129,7 +131,7 @@ class BaseTest(unittest.TestCase):
             except:
                 pass
         elapsed = time.time() - self._started_at
-        print('{} ({}s)'.format(self.id(), round(elapsed, 2)))
+        print(f'{self.id()} ({round(elapsed, 2)}s)')
 
     def simple_test_send_rec(self, dest, headers={}):
         self.listener.reset()
@@ -151,12 +153,17 @@ class BaseTest(unittest.TestCase):
 
     def assertListener(self, errMsg, numMsgs=0, numErrs=0, numRcts=0, timeout=10):
         if numMsgs + numErrs + numRcts > 0:
-            self._assertTrue(self.listener.wait(timeout), errMsg + " (#awaiting)")
+            self._assertTrue(self.listener.wait(timeout), f"{errMsg} (#awaiting)")
         else:
-            self._assertFalse(self.listener.wait(timeout), errMsg + " (#awaiting)")
-        self._assertEquals(numMsgs, len(self.listener.messages), errMsg + " (#messages)")
-        self._assertEquals(numErrs, len(self.listener.errors), errMsg + " (#errors)")
-        self._assertEquals(numRcts, len(self.listener.receipts), errMsg + " (#receipts)")
+            self._assertFalse(self.listener.wait(timeout), f"{errMsg} (#awaiting)")
+        self._assertEquals(
+            numMsgs, len(self.listener.messages), f"{errMsg} (#messages)"
+        )
+
+        self._assertEquals(numErrs, len(self.listener.errors), f"{errMsg} (#errors)")
+        self._assertEquals(
+            numRcts, len(self.listener.receipts), f"{errMsg} (#receipts)"
+        )
 
     def _assertTrue(self, bool, msg):
         if not bool:
@@ -199,17 +206,17 @@ class WaitableListener(ConnectionListener):
 
     def on_receipt(self, frame):
         if self.debug:
-            print('(on_receipt) frame: {}, headers: {}'.format(frame.body, frame.headers))
+            print(f'(on_receipt) frame: {frame.body}, headers: {frame.headers}')
         self._append(self.receipts, frame.body, frame.headers)
 
     def on_error(self, frame):
         if self.debug:
-            print('(on_error) frame: {}, headers: {}'.format(frame.body, frame.headers))
+            print(f'(on_error) frame: {frame.body}, headers: {frame.headers}')
         self._append(self.errors, frame.body, frame.headers)
 
     def on_message(self, frame):
         if self.debug:
-            print('(on_message) message: {}, headers: {}'.format(frame.body, frame.headers))
+            print(f'(on_message) message: {frame.body}, headers: {frame.headers}')
         self._append(self.messages, frame.body, frame.headers)
 
     def reset(self, count=1):
@@ -236,16 +243,17 @@ class WaitableListener(ConnectionListener):
 
     def print_state(self, hdr="", full=False):
         print(hdr)
-        print('#messages: {}'.format(len(self.messages)))
+        print(f'#messages: {len(self.messages)}')
         print('#errors: {}', len(self.errors))
-        print('#receipts: {}'.format(len(self.receipts)))
-        print('Remaining count: {}'.format(self.latch.get_count()))
+        print(f'#receipts: {len(self.receipts)}')
+        print(f'Remaining count: {self.latch.get_count()}')
         if full:
             if len(self.messages) != 0:
-                print('Messages: {}'.format(self.messages))
-            if len(self.errors) != 0: print('Messages: {}'.format(self.errors))
+                print(f'Messages: {self.messages}')
+            if len(self.errors) != 0:
+                print(f'Messages: {self.errors}')
             if len(self.receipts) != 0:
-                print('Messages: {}'.format(self.receipts))
+                print(f'Messages: {self.receipts}')
 
     def _next_msg_no(self):
         self.msg_no += 1
@@ -278,20 +286,17 @@ class Latch(object):
             self.cond.acquire(blocking=False)
             if self.count == 0:
                 return True
-            else:
-                self.cond.wait(timeout)
-                return self.count == 0
+            self.cond.wait(timeout)
+            return self.count == 0
         finally:
             self.cond.release()
 
     def wait_for_complete_countdown(self, timeout=None):
         try:
             self.cond.acquire()
-            if self.count == 0:
-                return True
-            else:
+            if self.count != 0:
                 self.cond.wait_for(lambda: self.count == 0, timeout)
-                return True
+            return True
         finally:
             self.cond.release()
 

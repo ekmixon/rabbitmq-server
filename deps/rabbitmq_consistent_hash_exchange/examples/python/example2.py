@@ -24,7 +24,7 @@ for q in ['q3', 'q4']:
 
 n = 100000
 
-for rk in list(map(lambda s: str(s), range(0, n))):
+for rk in list(map(lambda s: str(s), range(n))):
     hdrs = {u'hash-on': rk}
     ch.basic_publish(exchange='e2',
                      routing_key='',

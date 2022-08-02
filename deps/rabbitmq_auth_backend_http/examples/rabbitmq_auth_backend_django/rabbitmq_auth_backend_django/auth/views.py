@@ -17,8 +17,7 @@ def user(request):
         if username == 'someuser':
             return HttpResponse("allow")
 
-        user = authenticate(username=username, password=password)
-        if user:
+        if user := authenticate(username=username, password=password):
             if user.is_superuser:
                 return HttpResponse("allow administrator")
             else:

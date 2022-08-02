@@ -167,7 +167,7 @@ class TestAck(base.BaseTest):
                             headers={'prefetch-count': '5'})
 
         for x in range(10):
-            self.conn.send(destination, "test" + str(x))
+            self.conn.send(destination, f"test{str(x)}")
 
         self.assertFalse(self.listener.wait(3),
                          "Should not have been able to see 6 messages")

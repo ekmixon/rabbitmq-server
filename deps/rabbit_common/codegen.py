@@ -23,7 +23,7 @@ def convertTable(d):
     if len(d) == 0:
         return "[]"
     else:
-        raise Exception('Non-empty table defaults not supported ' + d)
+        raise Exception(f'Non-empty table defaults not supported {d}')
 
 erlangDefaultValueTypeConvMap = {
     bool : lambda x: str(x).lower(),
@@ -69,15 +69,10 @@ class PackedMethodBitField:
 
 def multiLineFormat(things, prologue, separator, lineSeparator, epilogue, thingsPerLine = 4):
     r = [prologue]
-    i = 0
-    for t in things:
+    for i, t in enumerate(things):
         if i != 0:
-            if i % thingsPerLine == 0:
-                r += [lineSeparator]
-            else:
-                r += [separator]
+            r += [lineSeparator] if i % thingsPerLine == 0 else [separator]
         r += [t]
-        i += 1
     r += [epilogue]
     return "".join(r)
 

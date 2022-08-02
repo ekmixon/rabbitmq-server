@@ -37,13 +37,27 @@ def log(msg):
 class RabbitTestCase(unittest.TestCase):
     def setUp(self):
         parser.set_conflict_handler('resolve')
-        (options, args) = make_configuration() 
+        (options, args) = make_configuration()
         AMQP_PORT =  int(options.port) - 10000
 
         self.mgmt = Management(options, args)
-        self.mgmt.put('/exchanges/%2f/' + TEXCH, '{"type" : "fanout", "durable":' + str(DURABLE).lower() + '}')
-        self.mgmt.put('/queues/%2f/' + TQUEUE, '{"auto_delete":false,"durable":' + str(DURABLE).lower() + ',"arguments":[]}') 
-        self.mgmt.post('/bindings/%2f/e/' + TEXCH + '/q/' + TQUEUE, '{"routing_key": ".*", "arguments":[]}')
+        self.mgmt.put(
+            f'/exchanges/%2f/{TEXCH}',
+            '{"type" : "fanout", "durable":' + str(DURABLE).lower() + '}',
+        )
+
+        self.mgmt.put(
+            f'/queues/%2f/{TQUEUE}',
+            '{"auto_delete":false,"durable":'
+            + str(DURABLE).lower()
+            + ',"arguments":[]}',
+        )
+
+        self.mgmt.post(
+            f'/bindings/%2f/e/{TEXCH}/q/{TQUEUE}',
+            '{"routing_key": ".*", "arguments":[]}',
+        )
+
         self.credentials = pika.PlainCredentials(options.username, options.password)
         parameters =  pika.ConnectionParameters(options.hostname, port=AMQP_PORT, credentials=self.credentials)
         self.connection = pika.BlockingConnection(parameters)
@@ -53,12 +67,12 @@ class RabbitTestCase(unittest.TestCase):
         parser.set_conflict_handler('resolve')
         (options, args) = make_configuration()
         self.mgmt = Management(options, args)
-        self.mgmt.delete('/queues/%2f/' + TQUEUE)
-        self.mgmt.delete('/exchanges/%2f/' + TEXCH)
+        self.mgmt.delete(f'/queues/%2f/{TQUEUE}')
+        self.mgmt.delete(f'/exchanges/%2f/{TEXCH}')
 
 class RabbitSlaTestCase(RabbitTestCase):
     def get_queue_stats(self, queue_name):
-        stats_str = self.mgmt.get('/queues/%2f/' + queue_name)
+        stats_str = self.mgmt.get(f'/queues/%2f/{queue_name}')
         return json.loads(stats_str)
 
     def get_head_message_timestamp(self, queue_name):
@@ -69,11 +83,11 @@ class RabbitSlaTestCase(RabbitTestCase):
                                    pika.BasicProperties(content_type='text/plain',
                                                         delivery_mode=DELIVERY_MODE,
                                                         timestamp=timestamp))
-        log("Sent message with body: " + str(message))
+        log(f"Sent message with body: {str(message)}")
 
     def receive(self, queue):
         method_frame, header_frame, body = self.channel.basic_get(queue = queue)
-        log("Received message with body: " + str(body))
+        log(f"Received message with body: {str(body)}")
         return method_frame.delivery_tag, body
 
     def ack(self, delivery_tag):
@@ -87,7 +101,7 @@ class RabbitSlaTestCase(RabbitTestCase):
         while ((clock() - stats_wait_start) < TIMEOUT_SECS and
                self.get_head_message_timestamp(queue) == old_timestamp):
             sleep(0.1)
-        log('Queue stats updated in ' + str(clock() - stats_wait_start) + ' secs.')
+        log(f'Queue stats updated in {str(clock() - stats_wait_start)} secs.')
         return self.get_head_message_timestamp(queue)
 
     # TESTS

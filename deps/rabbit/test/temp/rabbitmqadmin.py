@@ -219,7 +219,7 @@ def fmt_usage_stanza(root, verb):
 
     text = ""
     if verb != "":
-        verb = " " + verb
+        verb = f" {verb}"
     for k in root.keys():
         text += " {0} {1} {2}\n".format(verb, k, fmt_args(root[k]))
     return text
@@ -248,7 +248,7 @@ def make_parser():
     def add(*args, **kwargs):
         key = kwargs['dest']
         if key in default_options:
-            default = " [default: %s]" % default_options[key]
+            default = f" [default: {default_options[key]}]"
             kwargs['help'] = kwargs['help'] + default
         parser.add_option(*args, **kwargs)
 
@@ -356,10 +356,7 @@ def print_version():
     sys.exit(0)
 
 def column_sort_key(col):
-    if col in PROMOTE_COLUMNS:
-        return (1, PROMOTE_COLUMNS.index(col))
-    else:
-        return (2, col)
+    return (1, PROMOTE_COLUMNS.index(col)) if col in PROMOTE_COLUMNS else (2, col)
 
 def main():
     (options, args) = make_configuration()
@@ -368,10 +365,10 @@ def main():
         exit(0)
     assert_usage(len(args) > 0, 'Action not specified')
     mgmt = Management(options, args[1:])
-    mode = "invoke_" + args[0]
+    mode = f"invoke_{args[0]}"
     assert_usage(hasattr(mgmt, mode),
                  'Action {0} not understood'.format(args[0]))
-    method = getattr(mgmt, "invoke_%s" % args[0])
+    method = getattr(mgmt, f"invoke_{args[0]}")
     method()
 
 def output(s):
@@ -382,12 +379,7 @@ def die(s):
     exit(1)
 
 def maybe_utf8(s, stream):
-    if stream.isatty():
-        # It will have an encoding, which Python will respect
-        return s
-    else:
-        # It won't have an encoding, and Python will pick ASCII by default
-        return s.encode('utf-8')
+    return s if stream.isatty() else s.encode('utf-8')
 
 class Management:
     def __init__(self, options, args):
@@ -395,16 +387,16 @@ class Management:
         self.args = args
 
     def get(self, path):
-        return self.http("GET", "/api%s" % path, "")
+        return self.http("GET", f"/api{path}", "")
 
     def put(self, path, body):
-        return self.http("PUT", "/api%s" % path, body)
+        return self.http("PUT", f"/api{path}", body)
 
     def post(self, path, body):
-        return self.http("POST", "/api%s" % path, body)
+        return self.http("POST", f"/api{path}", body)
 
     def delete(self, path):
-        return self.http("DELETE", "/api%s" % path, "")
+        return self.http("DELETE", f"/api{path}", "")
 
     def http(self, method, path, body):
         if self.options.ssl:
@@ -469,7 +461,7 @@ class Management:
     def invoke_publish(self):
         (uri, upload) = self.parse_args(self.args, EXTRA_VERBS['publish'])
         upload['properties'] = {} # TODO do we care here?
-        if not 'payload' in upload:
+        if 'payload' not in upload:
             data = sys.stdin.read()
             upload['payload'] = base64.b64encode(data)
             upload['payload_encoding'] = 'base64'
@@ -496,17 +488,15 @@ class Management:
     def invoke_export(self):
         path = self.get_arg()
         definitions = self.get("/definitions")
-        f = open(path, 'w')
-        f.write(definitions)
-        f.close()
+        with open(path, 'w') as f:
+            f.write(definitions)
         self.verbose("Exported definitions for %s to \"%s\""
                      % (self.options.hostname, path))
 
     def invoke_import(self):
         path = self.get_arg()
-        f = open(path, 'r')
-        definitions = f.read()
-        f.close()
+        with open(path, 'r') as f:
+            definitions = f.read()
         self.post("/definitions", definitions)
         self.verbose("Imported definitions for %s from \"%s\""
                      % (self.options.hostname, path))
@@ -526,20 +516,19 @@ class Management:
         assert_usage(obj_type in obj_types,
                      "Don't know how to {0} {1}".format(verb, obj_type))
         obj_info = obj_types[obj_type]
-        uri = "/%s" % obj_type
+        uri = f"/{obj_type}"
         query = []
         if obj_info['vhost'] and self.options.vhost:
-            uri += "/%s" % urllib.quote_plus(self.options.vhost)
+            uri += f"/{urllib.quote_plus(self.options.vhost)}"
         if cols != []:
             query.append("columns=" + ",".join(cols))
-        sort = self.options.sort
-        if sort:
-            query.append("sort=" + sort)
+        if sort := self.options.sort:
+            query.append(f"sort={sort}")
         if self.options.sort_reverse:
             query.append("sort_reverse=true")
         query = "&".join(query)
         if query != "":
-            uri += "?" + query
+            uri += f"?{query}"
         return (uri, obj_info)
 
     def invoke_declare(self):
@@ -578,10 +567,7 @@ class Management:
         mandatory =  obj['mandatory']
         optional = obj['optional']
         uri_template = obj['uri']
-        upload = {}
-        for k in optional.keys():
-            if optional[k]:
-                upload[k] = optional[k]
+        upload = {k: optional[k] for k in optional.keys() if optional[k]}
         for arg in args:
             assert_usage("=" in arg,
                          'Argument "{0}" not in format name=value'.format(arg))
@@ -593,13 +579,11 @@ class Management:
             else:
                 upload[name] = value
         for m in mandatory:
-            assert_usage(m in upload.keys(),
-                         'mandatory argument "{0}" required'.format(m))
+            assert_usage(m in upload, 'mandatory argument "{0}" required'.format(m))
         if 'vhost' not in mandatory:
             upload['vhost'] = self.options.vhost or self.options.declare_vhost
         uri_args = {}
-        for k in upload:
-            v = upload[k]
+        for k, v in upload.items():
             if v and isinstance(v, basestring):
                 uri_args[k] = urllib.quote_plus(v)
                 if k == 'destination_type':
@@ -637,9 +621,7 @@ class Lister:
             output(string)
 
     def display(self, json_list):
-        depth = sys.maxint
-        if len(self.columns) == 0:
-            depth = int(self.options.depth)
+        depth = int(self.options.depth) if len(self.columns) == 0 else sys.maxint
         (columns, table) = self.list_to_table(json.loads(json_list), depth)
         if len(table) > 0:
             self.display_list(columns, table)
@@ -654,7 +636,7 @@ class Lister:
 
         def add(prefix, depth, item, fun):
             for key in item:
-                column = prefix == '' and key or (prefix + '.' + key)
+                column = prefix == '' and key or f'{prefix}.{key}'
                 subitem = item[key]
                 if type(subitem) == dict:
                     if self.obj_info.has_key('json') and key in self.obj_info['json']:
@@ -667,10 +649,12 @@ class Lister:
                     # mind (which come out looking decent); the second
                     # one has applications in nodes (which look less
                     # so, but what would look good?).
-                    if [x for x in subitem if type(x) != unicode] == []:
-                        serialised = " ".join(subitem)
-                    else:
-                        serialised = json.dumps(subitem)
+                    serialised = (
+                        json.dumps(subitem)
+                        if [x for x in subitem if type(x) != unicode]
+                        else " ".join(subitem)
+                    )
+
                     fun(column, serialised)
                 else:
                     fun(column, subitem)
@@ -759,7 +743,7 @@ class TableList(Lister):
         txt = "|"
         for i in xrange(0, len(col_widths)):
             fmt = " {0:" + align + unicode(col_widths[i]) + "} "
-            txt += fmt.format(row[i]) + "|"
+            txt += f"{fmt.format(row[i])}|"
         output(txt)
 
     def ascii_bar(self, col_widths):
@@ -776,9 +760,11 @@ class KeyValueList(Lister):
 
     def display_list(self, columns, table):
         for i in xrange(0, len(table)):
-            row = []
-            for j in xrange(0, len(columns)):
-                row.append("{0}=\"{1}\"".format(columns[j], table[i][j]))
+            row = [
+                "{0}=\"{1}\"".format(columns[j], table[i][j])
+                for j in xrange(0, len(columns))
+            ]
+
             output(" ".join(row))
 
 # TODO handle spaces etc in completable names
@@ -794,9 +780,7 @@ class BashList(Lister):
             if columns[i] == 'name':
                 ix = i
         if ix is not None:
-            res = []
-            for row in table:
-                res.append(row[ix])
+            res = [row[ix] for row in table]
             output(" ".join(res))
 
 FORMATS = {
@@ -813,13 +797,9 @@ def write_payload_file(payload_file, json_list):
     result = json.loads(json_list)[0]
     payload = result['payload']
     payload_encoding = result['payload_encoding']
-    f = open(payload_file, 'w')
-    if payload_encoding == 'base64':
-        data = base64.b64decode(payload)
-    else:
-        data = payload
-    f.write(data)
-    f.close()
+    with open(payload_file, 'w') as f:
+        data = base64.b64decode(payload) if payload_encoding == 'base64' else payload
+        f.write(data)
 
 def print_bash_completion():
     script = """# This is a bash completion script for rabbitmqadmin.
@@ -912,13 +892,19 @@ _rabbitmqadmin()
 
 """
     for l in LISTABLE:
-        key = l[0:len(l) - 1]
-        script += "        " + key + """)
-            opts="$(rabbitmqadmin -q -f bash list """ + l + """)"
+        key = l[:-1]
+        script += (
+            f"        {key}"
+            + """)
+            opts="$(rabbitmqadmin -q -f bash list """
+            + l
+            + """)"
 	    COMPREPLY=( $(compgen -W "${opts}"  -- ${cur}) )
             return 0
             ;;
 """
+        )
+
     script += """        *)
         ;;
     esac

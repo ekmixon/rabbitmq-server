@@ -20,7 +20,7 @@ for q in ["q3", "q4"]:
 
 n = 100000
 
-for rk in list(map(lambda s: str(s), range(0, n))):
+for rk in list(map(lambda s: str(s), range(n))):
     ch.basic_publish(exchange="e", routing_key=rk, body="")
 print("Done publishing.")
 

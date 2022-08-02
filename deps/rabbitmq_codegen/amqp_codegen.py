@@ -53,7 +53,7 @@ def extension_info_merger(key, acc, new, ignore_conflicts):
     return acc + [new]
 
 def domains_merger(key, acc, new, ignore_conflicts):
-    merged = dict((k, v) for [k, v] in acc)
+    merged = {k: v for [k, v] in acc}
     for [k, v] in new:
         if k in merged:
             if not ignore_conflicts:
@@ -64,7 +64,7 @@ def domains_merger(key, acc, new, ignore_conflicts):
     return [[k, v] for (k, v) in merged.items()]
 
 def merge_dict_lists_by(dict_key, acc, new, ignore_conflicts):
-    acc_index = set(v[dict_key] for v in acc)
+    acc_index = {v[dict_key] for v in acc}
     result = list(acc) # shallow copy
     for v in new:
         if v[dict_key] in acc_index:
@@ -94,7 +94,7 @@ def class_merger(acc, new, ignore_conflicts):
                                           ignore_conflicts)
 
 def classes_merger(key, acc, new, ignore_conflicts):
-    acc_dict = dict((v["name"], v) for v in acc)
+    acc_dict = {v["name"]: v for v in acc}
     result = list(acc) # shallow copy
     for w in new:
         if w["name"] in acc_dict:
@@ -141,15 +141,10 @@ class AmqpSpec:
 
         self.constants = []
         for d in self.spec['constants']:
-            if 'class' in d:
-                klass = d['class']
-            else:
-                klass = ''
+            klass = d['class'] if 'class' in d else ''
             self.constants.append((d['name'], d['value'], klass))
 
-        self.classes = []
-        for element in self.spec['classes']:
-            self.classes.append(AmqpClass(self, element))
+        self.classes = [AmqpClass(self, element) for element in self.spec['classes']]
 
     def allClasses(self):
         return self.classes
@@ -171,16 +166,12 @@ class AmqpClass(AmqpEntity):
         self.spec = spec
         self.index = int(self.element['id'])
 
-        self.methods = []
-        for method_element in self.element['methods']:
-            self.methods.append(AmqpMethod(self, method_element))
+        self.methods = [
+            AmqpMethod(self, method_element)
+            for method_element in self.element['methods']
+        ]
 
-        self.hasContentProperties = False
-        for method in self.methods:
-            if method.hasContent:
-                self.hasContentProperties = True
-                break
-
+        self.hasContentProperties = any(method.hasContent for method in self.methods)
         self.fields = []
         if 'properties' in self.element:
             index = 0
@@ -242,15 +233,19 @@ def do_main_dict(funcDict):
     def usage():
         print("Usage:", file = sys.stderr)
         print("  {0} <function> <path_to_amqp_spec.json>... <path_to_output_file>".format(sys.argv[0]), file = sys.stderr)
-        print(" where <function> is one of: {0}".format(", ".join([k for k in funcDict.keys()])), file = sys.stderr)
+        print(
+            " where <function> is one of: {0}".format(
+                ", ".join(list(funcDict.keys()))
+            ),
+            file=sys.stderr,
+        )
+
 
     def mkdir_p(path):
         try:
             os.makedirs(path)
         except OSError as exc:  # Python >2.5
-            if exc.errno == errno.EEXIST and os.path.isdir(path):
-                pass
-            else:
+            if exc.errno != errno.EEXIST or not os.path.isdir(path):
                 raise
 
     def execute(fn, amqp_specs, out_file):

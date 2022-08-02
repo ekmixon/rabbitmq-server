@@ -28,16 +28,22 @@ class AMQPType:
             self.fields = ['content']
 
     def define(self):
-        return ('SYMBOL_%s' % self.name.upper(), self.desc)
+        return f'SYMBOL_{self.name.upper()}', self.desc
 
 class AMQPDefines:
     def __init__(self, dom):
         self.name = safe(dom.getAttribute('name'))
         self.source = dom.getAttribute('source')
-        self.options = [(self.name.upper() + '_' +
-                         (safe(el.getAttribute('name')).upper()),
-                         el.getAttribute('value')) for el in
-                        dom.getElementsByTagName('choice')]
+        self.options = [
+            (
+                (
+                    f'{self.name.upper()}_'
+                    + (safe(el.getAttribute('name')).upper())
+                ),
+                el.getAttribute('value'),
+            )
+            for el in dom.getElementsByTagName('choice')
+        ]
 
 def print_erl(types):
     print("""-module(amqp10_framing0).
@@ -94,10 +100,7 @@ def print_hrl(types, defines):
 
 def print_define(opt, source):
     (name, value) = opt
-    if source == 'symbol':
-        quoted = '<<"%s">>' % value
-    else:
-        quoted = value
+    quoted = '<<"%s">>' % value if source == 'symbol' else value
     print("""-define(V_1_0_%s, {%s, %s}).""" % (name, source, quoted))
 
 def want_type(el):
@@ -110,7 +113,7 @@ def want_define(el):
 
 def parse_code(code):
     res = re.match('0x([0-9a-fA-F]{8,8}):0x([0-9a-fA-F]{8,8})', code)
-    return res and int(res.group(1) + res.group(2), 16)
+    return res and int(res[1] + res[2], 16)
 
 types = []
 defines = []

@@ -26,7 +26,7 @@ class TestReliability(base.BaseTest):
             self.conn.set_listener('', listener)
             self.subscribe_dest(self.conn, destination, None)
 
-            for x in range(0, count):
+            for x in range(count):
                 pub_conn.send(destination, msg + str(x))
             time.sleep(2.0)
             pub_conn.disconnect()
@@ -35,7 +35,7 @@ class TestReliability(base.BaseTest):
                 self.assertEqual(count, len(listener.messages))
             else:
                 listener.print_state("Final state of listener:")
-                self.fail("Did not receive %s messages in time" % count)
+                self.fail(f"Did not receive {count} messages in time")
         finally:
             if pub_conn.is_connected():
                 pub_conn.disconnect()

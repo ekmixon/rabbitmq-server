@@ -42,12 +42,9 @@ class TestExchange(base.BaseTest):
         self.assertFalse(self.conn.is_connected())
 
     def __test_exchange_send_rec(self, exchange, route = None):
-        if exchange != "amq.topic":
-            dest = "/exchange/" + exchange
-        else:
-            dest = "/topic"
+        dest = f"/exchange/{exchange}" if exchange != "amq.topic" else "/topic"
         if route != None:
-            dest += "/" + route
+            dest += f"/{route}"
 
         self.simple_test_send_rec(dest)
 
@@ -166,7 +163,7 @@ class TestQueue(base.BaseTest):
 
         self.assertListener("Missing messages/receipts", numMsgs=3, numRcts=2, timeout=3)
 
-        self.assertEqual(set(['a','b']), self.__gather_receipts())
+        self.assertEqual({'a', 'b'}, self.__gather_receipts())
 
     def test_interleaved_receipt_no_receipt_tx(self):
         ''' Test i-leaved receipt/no receipt, no-r bracketed by r+xactions '''
@@ -187,10 +184,10 @@ class TestQueue(base.BaseTest):
 
         self.assertListener("Missing messages/receipts", numMsgs=3, numRcts=2, timeout=40)
 
-        expected = set(['a', 'b'])
+        expected = {'a', 'b'}
         missing = expected.difference(self.__gather_receipts())
 
-        self.assertEqual(set(), missing, "Missing receipts: " + str(missing))
+        self.assertEqual(set(), missing, f"Missing receipts: {missing}")
 
     def test_interleaved_receipt_no_receipt_inverse(self):
         ''' Test i-leaved receipt/no receipt, r bracketed by no-rs '''
@@ -206,7 +203,7 @@ class TestQueue(base.BaseTest):
 
         self.assertListener("Missing messages/receipt", numMsgs=3, numRcts=1, timeout=3)
 
-        self.assertEqual(set(['a']), self.__gather_receipts())
+        self.assertEqual({'a'}, self.__gather_receipts())
 
     def __test_send_receipt(self, destination, before, after, headers = {}):
         count = 50
@@ -215,8 +212,8 @@ class TestQueue(base.BaseTest):
         before()
         expected_receipts = set()
 
-        for x in range(0, count):
-            receipt = "test" + str(x)
+        for x in range(count):
+            receipt = f"test{str(x)}"
             expected_receipts.add(receipt)
             self.conn.send(destination, "test receipt",
                            receipt=receipt, headers=headers)
@@ -227,14 +224,12 @@ class TestQueue(base.BaseTest):
         missing_receipts = expected_receipts.difference(
                     self.__gather_receipts())
 
-        self.assertEqual(set(), missing_receipts,
-                          "missing receipts: " + str(missing_receipts))
+        self.assertEqual(
+            set(), missing_receipts, f"missing receipts: {missing_receipts}"
+        )
 
     def __gather_receipts(self):
-        result = set()
-        for r in self.listener.receipts:
-            result.add(r['headers']['receipt-id'])
-        return result
+        return {r['headers']['receipt-id'] for r in self.listener.receipts}
 
 class TestTopic(base.BaseTest):
 
@@ -426,8 +421,8 @@ class TestDurableSubscription(base.BaseTest):
 
             n = 100
             # send 100 messages
-            for x in range(0, n):
-                self.conn.send(destination, "msg" + str(x))
+            for x in range(n):
+                self.conn.send(destination, f"msg{str(x)}")
 
             self.assertTrue(self.listener.wait_for_complete_countdown())
             self.assertEqual(n, len(self.listener.messages))
@@ -454,8 +449,8 @@ class TestDurableSubscription(base.BaseTest):
             listener2.reset(11) ## 10 messages and 1 receipt
 
             # send 100 messages
-            for x in range(0, 10):
-                self.conn.send(destination, "msg" + str(x))
+            for x in range(10):
+                self.conn.send(destination, f"msg{str(x)}")
 
             self.__subscribe(destination)
             self.__subscribe(destination, conn2, "other.id")

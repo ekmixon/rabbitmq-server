@@ -30,7 +30,7 @@ def pem_files(directory):
     return [os.path.join(directory, file) for file in files if is_pem(file)]
 
 def is_pem(file):
-    return 'pem' == os.path.splitext(file)[1][1:]
+    return os.path.splitext(file)[1][1:] == 'pem'
 
 def file_object(file):
     return {'id': file_id(file), 'path': path_for_file(file)}
@@ -39,8 +39,8 @@ def file_object(file):
 def file_id(file):
     mtime = str(int(os.stat(file).st_mtime))
     basename = os.path.basename(file)
-    return basename + ':' + mtime
+    return f'{basename}:{mtime}'
 
 def path_for_file(file):
     basename = os.path.basename(file)
-    return "/certs/" + basename
+    return f"/certs/{basename}"

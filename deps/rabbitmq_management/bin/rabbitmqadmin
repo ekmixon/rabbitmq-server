@@ -294,11 +294,7 @@ For more help use the help subcommand:
 def fmt_required_flag(val):
     # when one of the options is required, e.g.
     # password vs. password_hash
-    if type(val) is list:
-        # flag1=... OR flag2=... OR flag3=...
-        return "=... OR ".join(val)
-    else:
-        return val
+    return "=... OR ".join(val) if type(val) is list else val
 
 
 def fmt_optional_flag(val):
@@ -315,7 +311,7 @@ def fmt_usage_stanza(root, verb):
 
     text = ""
     if verb != "":
-        verb = " " + verb
+        verb = f" {verb}"
     for k in root.keys():
         text += " {0} {1} {2}\n".format(verb, k, fmt_args(root[k]))
     return text
@@ -351,7 +347,7 @@ def make_parser():
     def add(*args, **kwargs):
         key = kwargs['dest']
         if key in default_options:
-            default = " [default: %s]" % default_options[key]
+            default = f" [default: {default_options[key]}]"
             kwargs['help'] = kwargs['help'] + default
         parser.add_option(*args, **kwargs)
 
@@ -436,9 +432,8 @@ def make_configuration():
         config_file = default_config()
         if config_file is not None:
             setattr(final_options, "config", config_file)
-    else:
-        if not os.path.isfile(cli_options.config):
-            assert_usage(False, "Could not read config file '%s'" % cli_options.config)
+    elif not os.path.isfile(cli_options.config):
+        assert_usage(False, "Could not read config file '%s'" % cli_options.config)
 
     final_options = merge_default_options(cli_options, final_options)
     final_options = merge_config_file_options(cli_options, final_options)
@@ -462,9 +457,7 @@ def merge_config_file_options(cli_options, final_options):
             section_settings = dict(config_parser.items(final_options.node))
         except NoSectionError as error:
             # Report if an explicitly provided section (node) does not exist in the file
-            if final_options.node == "default":
-                pass
-            else:
+            if final_options.node != "default":
                 msg = "Could not read section '%s' in config file '%s':\n   %s" % (final_options.node, final_options.config, error)
                 assert_usage(False, msg)
         else:
@@ -472,10 +465,8 @@ def merge_config_file_options(cli_options, final_options):
                 # special case --ssl
                 if key == 'ssl':
                     setattr(final_options, key, section_val == "True")
-                else:
-                    # if CLI options do not contain this key, set it from the config file
-                    if getattr(cli_options, key) is None:
-                        setattr(final_options, key, section_val)
+                elif getattr(cli_options, key) is None:
+                    setattr(final_options, key, section_val)
     return final_options
 
 def expand_base_uri_options(cli_options, final_options):
@@ -503,10 +494,7 @@ def print_version():
 
 
 def column_sort_key(col):
-    if col in PROMOTE_COLUMNS:
-        return (1, PROMOTE_COLUMNS.index(col))
-    else:
-        return (2, col)
+    return (1, PROMOTE_COLUMNS.index(col)) if col in PROMOTE_COLUMNS else (2, col)
 
 
 def main():
@@ -516,10 +504,10 @@ def main():
         sys.exit(0)
     assert_usage(len(args) > 0, 'Action not specified')
     mgmt = Management(options, args[1:])
-    mode = "invoke_" + args[0]
+    mode = f"invoke_{args[0]}"
     assert_usage(hasattr(mgmt, mode),
                  'Action {0} not understood'.format(args[0]))
-    method = getattr(mgmt, "invoke_%s" % args[0])
+    method = getattr(mgmt, f"invoke_{args[0]}")
     method()
 
 
@@ -535,12 +523,7 @@ def maybe_utf8(s):
     if isinstance(s, float):
         # s can be also a float for message rate
         return str(s)
-    if sys.version_info[0] == 3:
-        # It will have an encoding, which Python will respect
-        return s
-    else:
-        # It won't have an encoding, and Python will pick ASCII by default
-        return s.encode('utf-8')
+    return s if sys.version_info[0] == 3 else s.encode('utf-8')
 
 
 class Management:
@@ -549,16 +532,16 @@ class Management:
         self.args = args
 
     def get(self, path):
-        return self.http("GET", "%s/api%s" % (self.options.path_prefix, path), "")
+        return self.http("GET", f"{self.options.path_prefix}/api{path}", "")
 
     def put(self, path, body):
-        return self.http("PUT", "%s/api%s" % (self.options.path_prefix, path), body)
+        return self.http("PUT", f"{self.options.path_prefix}/api{path}", body)
 
     def post(self, path, body):
-        return self.http("POST", "%s/api%s" % (self.options.path_prefix, path), body)
+        return self.http("POST", f"{self.options.path_prefix}/api{path}", body)
 
     def delete(self, path):
-        return self.http("DELETE", "%s/api%s" % (self.options.path_prefix, path), "")
+        return self.http("DELETE", f"{self.options.path_prefix}/api{path}", "")
 
     def __initialize_connection(self, hostname, port):
         if self.options.ssl:
@@ -567,16 +550,12 @@ class Management:
             return httplib.HTTPConnection(hostname, port, timeout=self.options.request_timeout)
 
     def __initialize_https_connection(self, hostname, port):
-        # Python 2.7.9+
         if hasattr(ssl, 'create_default_context'):
             return httplib.HTTPSConnection(hostname, port, context=self.__initialize_tls_context())
-        # Python < 2.7.8, note: those versions still have SSLv3 enabled
-        #                       and other limitations. See rabbitmq/rabbitmq-management#225
-        else:
-            eprint("WARNING: rabbitmqadmin requires Python 2.7.9+ when HTTPS is used.")
-            return httplib.HTTPSConnection(hostname, port,
-                                           cert_file=self.options.ssl_cert_file,
-                                           key_file=self.options.ssl_key_file)
+        eprint("WARNING: rabbitmqadmin requires Python 2.7.9+ when HTTPS is used.")
+        return httplib.HTTPSConnection(hostname, port,
+                                       cert_file=self.options.ssl_cert_file,
+                                       key_file=self.options.ssl_key_file)
 
     def __initialize_tls_context(self):
         # Python 2.7.9+ only
@@ -600,9 +579,9 @@ class Management:
 
     def http(self, method, path, body):
         conn = self.__initialize_connection(self.options.hostname, self.options.port)
-        auth = (self.options.username + ":" + self.options.password)
+        auth = f"{self.options.username}:{self.options.password}"
 
-        headers = {"Authorization": "Basic " + b64(auth)}
+        headers = {"Authorization": f"Basic {b64(auth)}"}
         if body != "":
             headers["Content-Type"] = "application/json"
         try:
@@ -633,7 +612,7 @@ class Management:
             [host, port] = url.netloc.split(':')
             self.options.hostname = host
             self.options.port = int(port)
-            return self.http(method, url.path + '?' + url.query, body)
+            return self.http(method, f'{url.path}?{url.query}', body)
         if resp.status > 400:
             raise Exception("Received response %d %s for path %s\n%s"
                             % (resp.status, resp.reason, path, resp.read()))
@@ -698,7 +677,7 @@ class Management:
         path = self.get_arg()
         uri = "/definitions"
         if self.options.vhost:
-            uri += "/%s" % quote_plus(self.options.vhost)
+            uri += f"/{quote_plus(self.options.vhost)}"
         definitions = self.get(uri)
         with open(path, 'wb') as f:
             f.write(definitions.encode())
@@ -711,7 +690,7 @@ class Management:
             definitions = f.read()
         uri = "/definitions"
         if self.options.vhost:
-            uri += "/%s" % quote_plus(self.options.vhost)
+            uri += f"/{quote_plus(self.options.vhost)}"
         self.post(uri, definitions)
         self.verbose("Uploaded definitions from \"%s\" to %s. The import process may take some time. Consult server logs to track progress."
                      % (self.options.hostname, path))
@@ -735,23 +714,22 @@ class Management:
         assert_usage(obj_type in obj_types,
                      "Don't know how to {0} {1}".format(verb, obj_type))
         obj_info = obj_types[obj_type]
-        uri = "/%s" % self._list_path_for_obj_type(obj_type)
+        uri = f"/{self._list_path_for_obj_type(obj_type)}"
         query = []
         if obj_info['vhost'] and self.options.vhost:
-            uri += "/%s" % quote_plus(self.options.vhost)
+            uri += f"/{quote_plus(self.options.vhost)}"
         cols = self.args[1:]
         if cols == [] and 'cols' in obj_info and self.use_cols():
             cols = obj_info['cols']
         if cols != []:
             query.append("columns=" + ",".join(cols))
-        sort = self.options.sort
-        if sort:
-            query.append("sort=" + sort)
+        if sort := self.options.sort:
+            query.append(f"sort={sort}")
         if self.options.sort_reverse:
             query.append("sort_reverse=true")
         query = "&".join(query)
         if query != "":
-            uri += "?" + query
+            uri += f"?{query}"
         return (uri, obj_info, cols)
 
     def invoke_declare(self):
@@ -801,10 +779,7 @@ class Management:
         mandatory = obj['mandatory']
         optional = obj['optional']
         uri_template = obj['uri']
-        upload = {}
-        for k in optional.keys():
-            if optional[k] is not None:
-                upload[k] = optional[k]
+        upload = {k: optional[k] for k in optional.keys() if optional[k] is not None}
         for arg in args:
             assert_usage("=" in arg,
                          'Argument "{0}" not in the name=value format'.format(arg))
@@ -813,8 +788,7 @@ class Management:
             mandatory_keys = []
             for key in mandatory:
                 if type(key) is list:
-                    for subkey in key:
-                        mandatory_keys.append(subkey)
+                    mandatory_keys.extend(iter(key))
                 else:
                     mandatory_keys.append(key)
 
@@ -829,8 +803,7 @@ class Management:
         if 'vhost' not in mandatory:
             upload['vhost'] = self.options.vhost or self.options.declare_vhost
         uri_args = {}
-        for k in upload:
-            v = upload[k]
+        for k, v in upload.items():
             if v and isinstance(v, (str, bytes)):
                 uri_args[k] = quote(v, '')
                 if k == 'destination_type':
@@ -875,9 +848,7 @@ class Lister:
             print(string)
 
     def display(self, json_list):
-        depth = sys.maxsize
-        if len(self.columns) == 0:
-            depth = int(self.options.depth)
+        depth = int(self.options.depth) if len(self.columns) == 0 else sys.maxsize
         (columns, table) = self.list_to_table(json.loads(json_list), depth)
         if len(table) > 0:
             self.display_list(columns, table)
@@ -892,7 +863,7 @@ class Lister:
 
         def add(prefix, depth, item, fun):
             for key in item:
-                column = prefix == '' and key or (prefix + '.' + key)
+                column = prefix == '' and key or f'{prefix}.{key}'
                 subitem = item[key]
                 if type(subitem) == dict:
                     if 'json' in self.obj_info and key in self.obj_info['json']:
@@ -905,10 +876,12 @@ class Lister:
                     # mind (which come out looking decent); the second
                     # one has applications in nodes (which look less
                     # so, but what would look good?).
-                    if [x for x in subitem if type(x) != str] == []:
-                        serialised = " ".join(subitem)
-                    else:
-                        serialised = json.dumps(subitem)
+                    serialised = (
+                        json.dumps(subitem)
+                        if [x for x in subitem if type(x) != str]
+                        else " ".join(subitem)
+                    )
+
                     fun(column, serialised)
                 else:
                     fun(column, subitem)
@@ -918,10 +891,7 @@ class Lister:
 
         def add_to_row(col, val):
             if col in column_ix:
-                if val is not None:
-                    row[column_ix[col]] = maybe_utf8(val)
-                else:
-                    row[column_ix[col]] = None
+                row[column_ix[col]] = maybe_utf8(val) if val is not None else None
 
         if len(self.columns) == 0:
             for item in items:
@@ -931,7 +901,7 @@ class Lister:
         else:
             columns = self.columns
 
-        for i in range(0, len(columns)):
+        for i in range(len(columns)):
             column_ix[columns[i]] = i
         for item in items:
             row = len(columns) * ['']
@@ -969,8 +939,8 @@ class LongList(Lister):
             max_width = max(max_width, len(col))
         fmt = "{0:>" + str(max_width) + "}: {1}"
         print(sep)
-        for i in range(0, len(table)):
-            for j in range(0, len(columns)):
+        for i in range(len(table)):
+            for j in range(len(columns)):
                 print(fmt.format(columns[j], table[i][j]))
             print(sep)
 
@@ -988,8 +958,8 @@ class TableList(Lister):
 
     def ascii_table(self, rows):
         col_widths = [0] * len(rows[0])
-        for i in range(0, len(rows[0])):
-            for j in range(0, len(rows)):
+        for i in range(len(rows[0])):
+            for j in range(len(rows)):
                 col_widths[i] = max(col_widths[i], len(rows[j][i]))
         self.ascii_bar(col_widths)
         self.ascii_row(col_widths, rows[0], "^")
@@ -1000,9 +970,9 @@ class TableList(Lister):
 
     def ascii_row(self, col_widths, row, align):
         txt = "|"
-        for i in range(0, len(col_widths)):
+        for i in range(len(col_widths)):
             fmt = " {0:" + align + str(col_widths[i]) + "} "
-            txt += fmt.format(row[i]) + "|"
+            txt += f"{fmt.format(row[i])}|"
         print(txt)
 
     def ascii_bar(self, col_widths):
@@ -1019,10 +989,12 @@ class KeyValueList(Lister):
         self.options = options
 
     def display_list(self, columns, table):
-        for i in range(0, len(table)):
-            row = []
-            for j in range(0, len(columns)):
-                row.append("{0}=\"{1}\"".format(columns[j], table[i][j]))
+        for i in range(len(table)):
+            row = [
+                "{0}=\"{1}\"".format(columns[j], table[i][j])
+                for j in range(len(columns))
+            ]
+
             print(" ".join(row))
 
 
@@ -1035,13 +1007,11 @@ class BashList(Lister):
 
     def display_list(self, columns, table):
         ix = None
-        for i in range(0, len(columns)):
+        for i in range(len(columns)):
             if columns[i] == 'name':
                 ix = i
         if ix is not None:
-            res = []
-            for row in table:
-                res.append(row[ix])
+            res = [row[ix] for row in table]
             print(" ".join(res))
 
 
@@ -1063,10 +1033,7 @@ def write_payload_file(payload_file, json_list):
     payload = result['payload']
     payload_encoding = result['payload_encoding']
     with open(payload_file, 'wb') as f:
-        if payload_encoding == 'base64':
-            data = base64.b64decode(payload)
-        else:
-            data = payload
+        data = base64.b64decode(payload) if payload_encoding == 'base64' else payload
         f.write(data.encode("utf-8"))
 
 
@@ -1161,13 +1128,19 @@ _rabbitmqadmin()
 
 """
     for l in LISTABLE:
-        key = l[0:len(l) - 1]
-        script += "        " + key + """)
-            opts="$(rabbitmqadmin -q -f bash list """ + l + """)"
+        key = l[:-1]
+        script += (
+            f"        {key}"
+            + """)
+            opts="$(rabbitmqadmin -q -f bash list """
+            + l
+            + """)"
             COMPREPLY=( $(compgen -W "${opts}"  -- ${cur}) )
             return 0
             ;;
 """
+        )
+
     script += """        *)
         ;;
     esac

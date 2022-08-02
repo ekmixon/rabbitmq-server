@@ -12,7 +12,7 @@ import os
 import os.path
 
 def ensure_ssl_auth_user():
-    user = 'O=client,CN=%s' % socket.gethostname()
+    user = f'O=client,CN={socket.gethostname()}'
     rabbitmqctl(['stop_app'])
     rabbitmqctl(['reset'])
     rabbitmqctl(['start_app'])
@@ -33,14 +33,18 @@ def disable_default_user():
     switch_config(default_user='[]')
 
 def switch_config(implicit_connect='', default_user=''):
-    cmd = ''
-    cmd += 'ok = io:format("~n===== Ranch listeners (before stop) =====~n~n~p~n", [ranch:info()]),'
+    cmd = (
+        ''
+        + 'ok = io:format("~n===== Ranch listeners (before stop) =====~n~n~p~n", [ranch:info()]),'
+    )
+
     cmd += '_ = application:stop(rabbitmq_stomp),'
     cmd += 'io:format("~n===== Ranch listeners (after stop) =====~n~n~p~n", [ranch:info()]),'
     if implicit_connect:
-        cmd += 'ok = application:set_env(rabbitmq_stomp,implicit_connect,{}),'.format(implicit_connect)
+        cmd += f'ok = application:set_env(rabbitmq_stomp,implicit_connect,{implicit_connect}),'
+
     if default_user:
-        cmd += 'ok = application:set_env(rabbitmq_stomp,default_user,{}),'.format(default_user)
+        cmd += f'ok = application:set_env(rabbitmq_stomp,default_user,{default_user}),'
     cmd += '_ = application:start(rabbitmq_stomp),'
     cmd += 'io:format("~n===== Ranch listeners (after start) =====~n~n~p~n", [ranch:info()]).'
     rabbitmqctl(['eval', cmd])

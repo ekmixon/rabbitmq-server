@@ -62,10 +62,9 @@ class TestParsing(unittest.TestCase):
         ''' helper: try to match a regexp with a string.
             Fail test if they do not match.
         '''
-        matched = re.match(pattern, data)
-        if matched:
+        if matched := re.match(pattern, data):
             return matched.groups()
-        self.assertTrue(False, 'No match:\n{}\n\n{}'.format(pattern, data))
+        self.assertTrue(False, f'No match:\n{pattern}\n\n{data}')
 
     def recv_atleast(self, bufsize):
         recvhead = []
@@ -122,21 +121,23 @@ class TestParsing(unittest.TestCase):
     @connect(['cd'])
     def test_send_without_content_type_binary(self):
         msg = 'hello'
-        cmd = ('\n'
-               'SUBSCRIBE\n'
-               'destination:/exchange/amq.fanout\n'
-               '\n\x00\n'
-               'SEND\n'
-               'destination:/exchange/amq.fanout\n' +
-               'content-length:{}\n\n'.format(len(msg)) +
-               '{}\x00'.format(msg))
+        cmd = (
+            '\n'
+            'SUBSCRIBE\n'
+            'destination:/exchange/amq.fanout\n'
+            '\n\x00\n'
+            'SEND\n'
+            'destination:/exchange/amq.fanout\n' + f'content-length:{len(msg)}\n\n'
+        ) + f'{msg}\x00'
+
         self.cd.sendall(cmd.encode('utf-8'))
-        resp = ('MESSAGE\n'
-                'destination:/exchange/amq.fanout\n'
-                'message-id:Q_/exchange/amq.fanout@@session-(.*)\n'
-                'redelivered:false\n' +
-                'content-length:{}\n'.format(len(msg)) +
-                '\n{}\0'.format(msg))
+        resp = (
+            'MESSAGE\n'
+            'destination:/exchange/amq.fanout\n'
+            'message-id:Q_/exchange/amq.fanout@@session-(.*)\n'
+            'redelivered:false\n' + f'content-length:{len(msg)}\n'
+        ) + f'\n{msg}\0'
+
         self.match(resp, self.cd.recv(4096).decode('utf-8'))
 
     @connect(['cd'])
@@ -274,8 +275,8 @@ class TestParsing(unittest.TestCase):
     def test_message_in_packets(self):
         ''' Test sending/receiving message in packets. '''
         base_dest='topic/test_embed_nulls_message\n'
-        dest='destination:/exchange/amq.' + base_dest
-        resp_dest='destination:/'+ base_dest
+        dest = f'destination:/exchange/amq.{base_dest}'
+        resp_dest = f'destination:/{base_dest}'
         subscribe=( 'SUBSCRIBE\n'
                     'id:xxx\n'
                     +dest+

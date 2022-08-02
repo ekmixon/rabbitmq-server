@@ -89,7 +89,10 @@ class TestErrors(base.BaseTest):
 
     def __test_invalid_destination(self, dtype, content):
         self.listener.reset()
-        self.conn.send("/" + dtype + content, '__test_invalid_destination:' + dtype + content)
+        self.conn.send(
+            f"/{dtype}{content}", f'__test_invalid_destination:{dtype}{content}'
+        )
+
 
         self.assertTrue(self.listener.wait())
         self.assertEqual(1, len(self.listener.errors))
